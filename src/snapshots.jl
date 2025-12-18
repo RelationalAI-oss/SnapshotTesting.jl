@@ -17,6 +17,7 @@ function create_expectation_snapshot(func, expected_dir, subpath)
 end
 
 function test_snapshot(func, expected_dir, subpath; allow_additions = true)
+    # We're testing against the expected files
     expected_path = joinpath(expected_dir, subpath)
 
     if !isdir(expected_path)
@@ -29,6 +30,7 @@ function test_snapshot(func, expected_dir, subpath; allow_additions = true)
         return nothing
     end
 
+    # Run the user code on the newly created directory
     output_path = mktempdir()
     snapshot_dir = joinpath(output_path, subpath)
     mkpath(snapshot_dir)
