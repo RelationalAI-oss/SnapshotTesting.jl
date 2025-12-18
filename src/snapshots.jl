@@ -30,9 +30,10 @@ function test_snapshot(func, expected_dir, subpath; allow_additions = true)
         return nothing
     end
 
-    # Run the user code on the newly created directory
     output_path = mktempdir()
     snapshot_dir = joinpath(output_path, subpath)
+
+    # Run the user code on the newly created directory
     mkpath(snapshot_dir)
     func(snapshot_dir)
 
