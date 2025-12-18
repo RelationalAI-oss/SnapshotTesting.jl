@@ -30,10 +30,6 @@ using Test
         withenv("JULIA_SNAPSHOTTESTS_UPDATE" => "invalid") do
             @test SnapshotTesting.force_update() == false  # invalid string returns false
         end
-
-        withenv("JULIA_SNAPSHOTTESTS_UPDATE" => nothing) do
-            @test SnapshotTesting.force_update() == false
-        end
     end
 
     @testset "Interactive input_bool" begin

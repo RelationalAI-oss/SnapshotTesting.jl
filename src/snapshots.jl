@@ -59,6 +59,9 @@ function test_snapshot(func, expected_dir, subpath; allow_additions = true)
         end
     end
 end
+
+# Diff all the files in the output directory against the expected directory, returning
+# whether or not we found any failures
 function _recursive_diff_dirs(expected_dir, new_dir; allow_additions)
     has_failures = false
 
