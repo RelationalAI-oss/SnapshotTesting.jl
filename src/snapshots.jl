@@ -16,9 +16,17 @@ function create_expectation_snapshot(func, expected_dir, subpath)
     func(snapshot_dir)
 end
 
-function test_snapshot(func, expected_dir, subpath; allow_additions = true, regenerate = false)
-    if regenerate
-        create_expectation_snapshot(func, expected_dir, subpath)
+function test_snapshot(func, expected_dir, subpath; allow_additions = true)
+    # We're testing against the expected files
+    expected_path = joinpath(expected_dir, subpath)
+
+    if !isdir(expected_path)
+        mkpath(expected_path)
+        func(expected_path)
+        @info """Snapshot for \"$subpath\" did not exist. It has been created at:
+        $expected_path
+        """
+        @info "Please run the tests again for any changes to take effect"
         return nothing
     end
 
@@ -29,14 +37,34 @@ function test_snapshot(func, expected_dir, subpath; allow_additions = true, rege
     mkpath(snapshot_dir)
     func(snapshot_dir)
 
-    # Test against the expected files
-    expected_path = joinpath(expected_dir, subpath)
     @testset "$subpath" begin
-        _recursive_diff_dirs(expected_path, snapshot_dir; allow_additions)
+        has_failures = _recursive_diff_dirs(expected_path, snapshot_dir; allow_additions)
+
+        if has_failures
+            if isinteractive() || force_update()
+                if force_update() || input_bool("Replace snapshot with actual result (in $subpath)?")
+                    rm(expected_path; recursive=true, force=true)
+                    cp(snapshot_dir, expected_path; force=true)
+                    @info "Snapshot updated at $expected_path"
+                    @info "Please run the tests again for any changes to take effect"
+                end
+            else
+                @error """
+                Snapshot test failed for \"$subpath\".
+                To update the snapshots either run the tests interactively with 'include(\"test/runtests.jl\")',
+                or to force-update all failing snapshots set the environment variable `JULIA_SNAPSHOTTESTS_UPDATE`
+                to "true" and re-run the tests via Pkg.
+                """
+            end
+        end
     end
 end
-# Diff all the files in the output directory against the expected directory
+
+# Diff all the files in the output directory against the expected directory, returning
+# whether or not we found any failures
 function _recursive_diff_dirs(expected_dir, new_dir; allow_additions)
+    has_failures = false
+
     # Collect new files
     new_files = Set(String[])
     for (root, _, files) in walkdir(new_dir)
@@ -54,6 +82,7 @@ function _recursive_diff_dirs(expected_dir, new_dir; allow_additions)
             subpath = _chopprefix(_chopprefix(expected_path, expected_dir), "/")
             @test subpath in new_files
             if !(subpath in new_files)
+                has_failures = true
                 @error("New snapshot is missing file `$subpath`. Expected contents:\n",
                         expected_content)
             else
@@ -62,6 +91,7 @@ function _recursive_diff_dirs(expected_dir, new_dir; allow_additions)
                 new_content = read(new_path, String)
                 @test new_content == expected_content
                 if new_content != expected_content
+                    has_failures = true
                     println("Found non-matching content in `$file`.")
                     display(DeepDiffs.deepdiff(expected_content, new_content))
                 end
@@ -74,6 +104,7 @@ function _recursive_diff_dirs(expected_dir, new_dir; allow_additions)
     if !allow_additions
         # Report test failures for the new files if requested
         if !isempty(new_files)
+            has_failures = true
             @error("New snapshot contains unexpected files. If this is not an error in your
                 case, pass `allow_additions = true`.")
             for path in new_files
@@ -86,6 +117,8 @@ function _recursive_diff_dirs(expected_dir, new_dir; allow_additions)
             end
         end
     end
+
+    return has_failures
 end
 
 
@@ -100,5 +133,34 @@ function _chopprefix(s::AbstractString, prefix::AbstractString)
         i[1] == j[1] || return SubString(s) # mismatch: failure
         k = i[2]
         i, j = iterate(s, k), iterate(prefix, j[2])
+    end
+end
+
+"""
+    force_update()
+
+Check if the environment variable `JULIA_SNAPSHOTTESTS_UPDATE` is set to "true".
+When true, all failing snapshot tests will automatically update their references.
+"""
+force_update() = tryparse(Bool, get(ENV, "JULIA_SNAPSHOTTESTS_UPDATE", "false")) === true
+
+"""
+    input_bool(prompt)
+
+Display an interactive y/n prompt and return true for 'y', false for 'n'.
+Loops until a valid response is given.
+"""
+function input_bool(prompt)
+    while true
+        println(prompt, " [y/n]")
+        response = readline()
+        length(response) == 0 && continue
+        reply = lowercase(first(strip(response)))
+        if reply == 'y'
+            return true
+        elseif reply == 'n'
+            return false
+        end
+        # Otherwise loop and repeat the prompt
     end
 end
