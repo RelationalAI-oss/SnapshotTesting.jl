@@ -1,9 +1,9 @@
 """
-    SnapshotTestSuite
+    SnapshotTestSuite{X}
 
-Abstract type for dispatch-based snapshot test suites. Packages define a concrete
-subtype and overload the interface functions to get automatic test iteration,
-filtering, and plumbing.
+Parameterized type for dispatch-based snapshot test suites (following the Salsa
+`Keyspace{X}` pattern). Packages pick a unique symbol `X` and overload the
+interface functions to get automatic test iteration, filtering, and plumbing.
 
 # Required methods
 - `snapshot_tests(suite)` — return a `Vector{Pair{String,String}}` of `(name, path)` pairs
@@ -17,19 +17,19 @@ filtering, and plumbing.
 # Example
 
 ```julia
-struct MySnapshots <: SnapshotTestSuite end
+const MySuite = SnapshotTestSuite{:my_package}
 
-SnapshotTesting.snapshot_tests(::MySnapshots) = [("test1" => "path/to/test1"), ...]
-SnapshotTesting.snapshot_expected_dir(::MySnapshots) = joinpath(@__DIR__, "expected")
-function SnapshotTesting.snapshot_produce(::MySnapshots, name, path, dir)
+SnapshotTesting.snapshot_tests(::MySuite) = [("test1" => "path/to/test1"), ...]
+SnapshotTesting.snapshot_expected_dir(::MySuite) = joinpath(@__DIR__, "expected")
+function SnapshotTesting.snapshot_produce(::MySuite, name, path, dir)
     write(joinpath(dir, "out.txt"), run_my_code(path))
 end
 
-run_snapshot_tests(MySnapshots())
-run_snapshot_tests(MySnapshots(); filter="test1")  # run single test
+run_snapshot_tests(MySuite())
+run_snapshot_test(MySuite(), "test1")  # run single test
 ```
 """
-abstract type SnapshotTestSuite end
+struct SnapshotTestSuite{X} end
 
 """
     snapshot_tests(suite::SnapshotTestSuite) -> Vector{Pair{String,String}}
@@ -101,6 +101,15 @@ function run_snapshot_tests(suite::SnapshotTestSuite; filter=nothing, skip=Strin
         @warn "No snapshot tests matched the filter" filter
     end
 end
+
+"""
+    run_snapshot_test(suite::SnapshotTestSuite, name::AbstractString)
+
+Run a single snapshot test by name. Convenience wrapper around
+`run_snapshot_tests(suite; filter=name)`.
+"""
+run_snapshot_test(suite::SnapshotTestSuite, name::AbstractString) =
+    run_snapshot_tests(suite; filter=name)
 
 _make_filter(::Nothing) = _ -> true
 _make_filter(name::AbstractString) = n -> n == name

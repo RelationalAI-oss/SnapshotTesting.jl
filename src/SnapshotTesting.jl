@@ -13,6 +13,7 @@ export SnapshotTestSuite,
     snapshot_produce,
     snapshot_test_extras,
     snapshot_allow_additions,
-    run_snapshot_tests
+    run_snapshot_tests,
+    run_snapshot_test
 
 end
