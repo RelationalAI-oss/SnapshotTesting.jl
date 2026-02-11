@@ -8,4 +8,7 @@ using Test
     @testset "update modes" begin
         include("test_update_modes.jl")
     end
+    @testset "suite" begin
+        include("test_suite.jl")
+    end
 end
